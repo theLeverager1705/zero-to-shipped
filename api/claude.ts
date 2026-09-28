@@ -7,8 +7,10 @@ const DEFAULT_MODELS = 'anthropic.claude-opus-5,anthropic.claude-sonnet-5';
 // API Gateway cuts requests off at 30s, so the whole model chain must finish well inside that.
 const TIME_BUDGET_MS = 24_000;
 const MIN_ATTEMPT_MS = 3_000;
+const UNAVAILABLE_RETRY_MS = 10 * 60_000;
 
-const unavailableModels = new Set<string>();
+// Models that returned 403/404 are skipped for a while, so enabling access in Bedrock takes effect without a redeploy.
+const unavailableUntil = new Map<string, number>();
 let client: AnthropicBedrockMantle | undefined;
 
 export type ClaudeOutcome<T> = { ok: true; value: T; model: string } | { ok: false; reason: string };
@@ -37,7 +39,7 @@ function bedrock(): AnthropicBedrockMantle {
 
 function describeFailure(model: string, err: unknown): string {
   if (err instanceof PermissionDeniedError || err instanceof NotFoundError) {
-    unavailableModels.add(model);
+    unavailableUntil.set(model, Date.now() + UNAVAILABLE_RETRY_MS);
     return `${model} is not available to this AWS account (${err.status})`;
   }
   if (err instanceof RateLimitError) return `${model} is rate limited`;
@@ -54,7 +56,7 @@ async function withModelChain<T>(attempt: (model: string, timeout: number) => Pr
   const deadline = Date.now() + TIME_BUDGET_MS;
   let reason = 'No Claude model is available';
   for (const model of modelChain()) {
-    if (unavailableModels.has(model)) continue;
+    if ((unavailableUntil.get(model) ?? 0) > Date.now()) continue;
     const timeout = deadline - Date.now();
     if (timeout < MIN_ATTEMPT_MS) {
       reason = 'Claude took too long to respond';
