@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Anchor · the family co-pilot for Gen Alpha</title>
+    <meta
+      name="description"
+      content="Anchor connects kids, parents and teachers around one shared plan. Kids check in and run quests, parents get an AI weekly brief from Claude on Amazon Bedrock, and teachers close the loop from school."
+    />
+    <meta name="theme-color" content="#13233a" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Anchor · the family co-pilot for Gen Alpha" />
+    <meta
+      property="og:description"
+      content="One shared plan for the kid in the middle. A live demo built on AWS for Zero to Shipped 2026."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="root">
+      <main class="static-fallback">
+        <h1>Anchor: the family co-pilot for Gen Alpha</h1>
+        <p>
+          Anchor connects the three people who shape a Gen Alpha kid’s week. Kids check in and run quests, parents get an AI weekly brief grounded in
+          real signals, and teachers close the loop from school.
+        </p>
+        <h2>What it does</h2>
+        <ul>
+          <li>Kids: a 30-second mood and energy check-in, quests that earn screen time, and a screen-time budget they can see.</li>
+          <li>Parents: a weekly brief written by Claude on Amazon Bedrock, with wins, watch-outs, patterns and conversation starters, plus an AI coach.</li>
+          <li>Teachers: notes home that become quests, and a consent-aware class pulse.</li>
+        </ul>
+        <h2>How it is built</h2>
+        <p>
+          React on Amazon CloudFront and S3, a Node.js API on AWS Lambda behind Amazon API Gateway, Amazon DynamoDB for family workspaces, Claude on
+          Amazon Bedrock for insights with a rules-engine fallback, and the AWS CDK for infrastructure. Built with Claude Code for AWS Zero to Shipped
+          2026 (Startups lane).
+        </p>
+        <p><a href="#/parent">Open the live demo</a> (JavaScript required).</p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
