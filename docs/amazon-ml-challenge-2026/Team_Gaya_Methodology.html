@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Team Gaya Methodology</title>
+<style>
+  @page { size: A4; margin: 14mm 14mm 14mm 14mm; }
+  :root { --ink:#1b1f24; --muted:#57606a; --rule:#d0d7de; --accent:#0b5cad; --tint:#f3f6fa; }
+  * { box-sizing: border-box; }
+  body { font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif; font-size: 9.8pt; line-height: 1.38;
+         color: var(--ink); background: #fff; margin: 0; }
+  h1 { font-size: 19pt; margin: 0 0 2pt; letter-spacing: -0.2pt; }
+  h2 { font-size: 13pt; margin: 16pt 0 5pt; padding-bottom: 3pt; border-bottom: 1.5pt solid var(--accent);
+       color: var(--accent); break-after: avoid; }
+  h3 { font-size: 10.5pt; margin: 10pt 0 3pt; break-after: avoid; }
+  p { margin: 0 0 6pt; }
+  ul, ol { margin: 0 0 6pt; padding-left: 15pt; }
+  li { margin: 0 0 2.5pt; }
+  code, .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 8.6pt; }
+  table { border-collapse: collapse; width: 100%; margin: 4pt 0 8pt; font-size: 9pt; break-inside: avoid; }
+  th, td { border: 0.6pt solid var(--rule); padding: 3pt 5pt; text-align: left; vertical-align: top; }
+  th { background: var(--tint); font-weight: 700; }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  tr.hl td { font-weight: 700; background: #eef5ec; }
+  .sub { color: var(--muted); font-size: 10pt; margin-bottom: 8pt; }
+  .meta { display: grid; grid-template-columns: auto 1fr; gap: 1pt 10pt; font-size: 9pt; margin: 6pt 0 10pt; }
+  .meta b { color: var(--muted); font-weight: 700; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6pt; margin: 6pt 0 10pt; }
+  .kpi { border: 0.8pt solid var(--rule); border-radius: 4pt; padding: 6pt 7pt; background: var(--tint); }
+  .kpi .v { font-size: 15pt; font-weight: 700; color: var(--accent); }
+  .kpi .l { font-size: 8pt; color: var(--muted); line-height: 1.25; }
+  .flow { display: flex; align-items: stretch; gap: 0; margin: 6pt 0 10pt; break-inside: avoid; }
+  .flow .box { flex: 1; border: 0.8pt solid var(--accent); border-radius: 4pt; padding: 5pt 5pt; font-size: 8pt;
+               line-height: 1.28; background: #fff; }
+  .flow .box b { display: block; font-size: 8.6pt; color: var(--accent); margin-bottom: 2pt; }
+  .flow .arr { flex: 0 0 11pt; display: flex; align-items: center; justify-content: center; color: var(--accent);
+               font-size: 11pt; }
+  .note { border-left: 2.5pt solid var(--accent); background: var(--tint); padding: 5pt 8pt; margin: 6pt 0 8pt;
+          font-size: 9pt; break-inside: avoid; }
+  .formula { font-family: "DejaVu Serif", serif; font-size: 9.6pt; background: var(--tint); padding: 4pt 8pt;
+             margin: 3pt 0 6pt; border-radius: 3pt; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; break-inside: avoid; }
+  .small { font-size: 8.6pt; color: var(--muted); }
+  .avoid { break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<h1>Business Entity Resolution: Approach &amp; Methodology</h1>
+<div class="sub">Amazon ML Challenge 2026 &middot; Team Gaya</div>
+<div class="meta">
+  <b>Submitted by</b><span>Chaitanya Ram S (Team Gaya)</span>
+  <b>Date</b><span>2 October 2026</span>
+  <b>Code</b><span>github.com/theLeverager1705/Team-Gaya-ER-Challenge-2026 (submitted pipeline: <code>code/business_entity_resolution/</code>)</span>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">0.9264</div><div class="l">Macro F0.5 on 30,057 held-out training entities (never used for fitting or selection)</div></div>
+  <div class="kpi"><div class="v">0.902</div><div class="l">Public leaderboard macro F0.5 (v2; test includes France, unseen in training)</div></div>
+  <div class="kpi"><div class="v">3.84</div><div class="l">Candidate pairs per Source 1 entity on test (6.65M pairs out of ~1.7&times;10<sup>13</sup> possible)</div></div>
+  <div class="kpi"><div class="v">0.980 / 0.854</div><div class="l">Pair precision / pair recall on the held-out split</div></div>
+</div>
+
+<p><b>In one paragraph.</b> Candidates come from IDF-weighted retrieval over rare <i>name and address</i> keys inside
+each country, computed as chunked sparse-matrix products so the whole corpus fits on one laptop. A two-stage LightGBM
+model scores each candidate pair: stage 1 uses 26 pairwise features; stage 2 adds 12 <i>group-context</i> features
+that compare each candidate with the entity's other candidates, because the true matches of one business resemble
+each other. A learned pre-filter shrinks the candidate set from 30 to about 3.8 per entity at no measurable cost, and
+a decision rule tuned directly for macro F0.5 turns probabilities into match lists.</p>
+
+<!-- ============================================================ -->
+<h2>1. Methodology</h2>
+
+<h3>1.1 Problem and metric</h3>
+<p>For every Source 1 business, return all Source 2 / Source 3 records that describe the same real-world business.
+Scoring is macro F0.5 per Source 1 entity, with singletons included (a singleton scores 1 only for an empty
+prediction). F0.5 weights precision above recall, so the pipeline is tuned to avoid wrong merges.</p>
+
+<h3>1.2 What the data told us</h3>
+<ul>
+  <li><b>Scale.</b> 2.21M training and 1.73M test Source 1 entities, each split with about 10M Source 2+3 records.
+      All-pairs comparison is impossible, so blocking has to use inverted indexes.</li>
+  <li><b>Labels.</b> 5.6% of training entities are singletons; the rest have 1&ndash;11 matches (mean 3.7). In a
+      5,000-entity sample, all 17,362 true pairs share the <code>country</code> label, so country is a safe partition key.</li>
+  <li><b>Noise.</b> Source 2 names are often written in native script (Bengali, Devanagari); unrelated trade/DBA names
+      appear at the same address (<i>Syndrex</i> &harr; <i>Straight Edge Pub</i>, both at 515 Monroe Ave); injected
+      diacritics (<i>C&aacute;ble</i>, <i>Pr&iacute;vate</i>); character swaps (<i>Co1onial</i>); word-order changes;
+      legal-suffix churn (<i>Pvt Ltd</i> / <i>Private Limited</i>); abbreviated or reordered addresses; perturbed street
+      numbers (<i>26</i> vs <i>26/6</i>).</li>
+  <li><b>Consequence:</b> the address is as important as the name, and name-only matching fails.</li>
+  <li>Up to 349 lines per file contain a literal <code>"</code>, so files are read with quote handling disabled
+      (<code>QUOTE_NONE</code>; every line has exactly 4 tab-separated fields).</li>
+</ul>
+
+<h3>1.3 Pipeline</h3>
+<div class="flow">
+  <div class="box"><b>Normalize</b>NFKD accent strip, lowercase, abbreviation expansion, core name, address numbers</div>
+  <div class="arr">&rarr;</div>
+  <div class="box"><b>Retrieve</b>IDF-weighted rare name + address keys, per country, top-30 per entity</div>
+  <div class="arr">&rarr;</div>
+  <div class="box"><b>Stage 1</b>26 pair features &rarr; LightGBM &rarr; p1</div>
+  <div class="arr">&rarr;</div>
+  <div class="box"><b>Pre-filter</b>keep p1 &ge; 0.1 &rarr; <code>candidate_pairs.tsv</code> (3.84 / entity)</div>
+  <div class="arr">&rarr;</div>
+  <div class="box"><b>Stage 2</b>+12 group-context features &rarr; LightGBM &rarr; p2</div>
+  <div class="arr">&rarr;</div>
+  <div class="box"><b>Decide</b>rule tuned for macro F0.5 &rarr; <code>matching_results.tsv</code></div>
+</div>
+
+<h3>1.4 Training and validation protocol</h3>
+<ul>
+  <li><b>Hold-out by hash.</b> About 10% of training Source 1 entities (CRC32 of the id mod 10 = 0) are excluded from
+      training altogether and used only for end-to-end checks of the full pipeline.</li>
+  <li><b>Training sample.</b> 300,000 Source 1 entities sampled from the rest (seed 42), blocked against the
+      <i>full</i> training Source 2/3 corpus so candidate lists look exactly like test-time lists. This produced 8.99M
+      labelled candidate pairs.</li>
+  <li><b>Entity-level split</b> of that sample: 80% <i>fit</i> / 10% <i>tune</i> (early stopping and every rule or
+      cutoff choice) / 10% <i>report</i> (never used for any decision; all reported scores come from here).</li>
+  <li><b>Out-of-fold stage 1.</b> Within <i>fit</i>, two folds produce out-of-fold stage-1 probabilities, so stage 2
+      learns from probabilities of the same quality it sees at inference.</li>
+  <li>Fully deterministic: fixed seeds, LightGBM <code>deterministic=True</code>, murmur3 key hashing.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>2. Candidate Generation / Blocking Strategy</h2>
+
+<h3>2.1 Normalization</h3>
+<ul>
+  <li>NFKD accent stripping (<i>C&aacute;ble</i> &rarr; <i>cable</i>), lowercase, apostrophes removed, all other
+      punctuation to spaces.</li>
+  <li>Generic abbreviation expansion applied identically to every record: street types (<i>rd</i> &rarr; <i>road</i>,
+      <i>blvd</i>, <i>hwy</i> ...), units (<i>ste</i>, <i>apt</i>, <i>fl</i>), directions (<i>n</i>, <i>ne</i> ...),
+      Indian address words (<i>ngr</i> &rarr; <i>nagar</i>, <i>opp</i>, <i>nr</i>) and legal forms
+      (<i>pvt</i> &rarr; <i>private</i>, <i>ltd</i> &rarr; <i>limited</i>, <i>corp</i>, <i>inc</i>).</li>
+  <li><b>Core name:</b> the normalized name minus legal forms and function words (<i>private, limited, llc, gmbh, sarl,
+      sas, the, and, de, la</i> ...), so <i>Pvt Ltd</i> / <i>Private Limited</i> churn disappears.</li>
+  <li>Derived fields: sorted unique address numbers, first address number (usually the street number), core-name token
+      count, and the share of non-ASCII characters in the raw name (native-script detector).</li>
+</ul>
+
+<h3>2.2 Step 1: IDF-weighted rare-key retrieval</h3>
+<ul>
+  <li><b>Keys.</b> Core-name tokens (length &gt; 1), core-name bigrams, address tokens (length &gt; 1, or any number),
+      and address bigrams, prefixed by type and hashed into 2<sup>24</sup> buckets (scikit-learn
+      <code>HashingVectorizer</code>, binary, no vocabulary in memory).</li>
+  <li><b>Rare keys only.</b> Keys occurring in more than 1,000 Source 2/3 records of the partition are dropped as
+      non-discriminative.</li>
+  <li><b>Score.</b> For Source 1 record <i>q</i> and Source 2/3 record <i>c</i> in the same country, with <i>N</i> the
+      partition size and df(<i>k</i>) the key's document frequency:</li>
+</ul>
+<div class="formula">score(q, c) = &Sigma;<sub>k &isin; K<sub>name</sub>(q) &cap; K<sub>name</sub>(c)</sub> idf(k)
+  &nbsp;+&nbsp; &Sigma;<sub>k &isin; K<sub>addr</sub>(q) &cap; K<sub>addr</sub>(c)</sub> idf(k),
+  &nbsp;&nbsp; idf(k) = log(1 + N / df(k)) if df(k) &le; 1000, else 0</div>
+<ul>
+  <li><b>Computation.</b> For each country, Source 2/3 is indexed as a sparse key &times; record matrix; Source 1 rows
+      are IDF-weighted query vectors. Scores for 5,000 Source 1 rows at a time are one sparse matrix product
+      (name and address separately, then summed), followed by a vectorised top-K per row. The name and address parts
+      of the score are kept and reused as features.</li>
+  <li><b>Country as an open set.</b> Partitions are whatever labels appear in Source 1, so France (absent from
+      training) needs no special handling. Country is never one-hot encoded or used as a model feature.</li>
+  <li><b>Why addresses:</b> address keys recover true matches whose name is in a native script or is an unrelated trade
+      name, where the name shares nothing with Source 1.</li>
+</ul>
+
+<div class="two">
+<div>
+<h3>2.3 Choosing K (recall at full corpus scale, 20k entities)</h3>
+<table>
+  <tr><th>Top-K retrieved</th><th class="n">True pairs kept</th></tr>
+  <tr><td>5</td><td class="n">79.2%</td></tr>
+  <tr><td>20</td><td class="n">90.4%</td></tr>
+  <tr class="hl"><td>30 (chosen, the knee)</td><td class="n">91.5%</td></tr>
+  <tr><td>60</td><td class="n">93.0%</td></tr>
+</table>
+<p class="small">On the 300k training sample, top-30 retrieval gave 29.96 pairs per entity and a recall ceiling of 91.4%.</p>
+</div>
+<div>
+<h3>2.4 Step 2: learned pre-filter</h3>
+<p>The stage-1 model scores all 30 retrieved pairs, and only pairs with p1 &ge; 0.1 stay candidates. The cutoff is the
+largest value in {0, 0.001, 0.003, 0.01, 0.02, 0.05, 0.1} whose <i>tune</i>-split macro F0.5 is within 0.0001 of using
+no cutoff. The final (stage-2) model scores only these pairs, and they are exactly <code>candidate_pairs.tsv</code>;
+matches are always a subset.</p>
+</div>
+</div>
+
+<table>
+  <tr><th>p1 cutoff (report split)</th><th class="n">Candidates / entity</th><th class="n">Recall ceiling</th><th class="n">Macro F0.5</th></tr>
+  <tr><td>none</td><td class="n">29.95</td><td class="n">91.37%</td><td class="n">0.9264</td></tr>
+  <tr><td>0.001</td><td class="n">5.49</td><td class="n">91.35%</td><td class="n">0.9264</td></tr>
+  <tr><td>0.01</td><td class="n">4.31</td><td class="n">91.22%</td><td class="n">0.9264</td></tr>
+  <tr><td>0.05</td><td class="n">3.80</td><td class="n">90.85%</td><td class="n">0.9263</td></tr>
+  <tr class="hl"><td>0.1 (chosen on the tune split)</td><td class="n">3.63</td><td class="n">90.42%</td><td class="n">0.9263</td></tr>
+</table>
+
+<div class="note"><b>Final candidate set on test:</b> 51.9M retrieved pairs &rarr; <b>6,652,763 candidate pairs
+(3.84 per Source 1 entity)</b>, against ~1.7&times;10<sup>13</sup> possible pairs (a reduction of more than 99.99999%).
+56,812 entities have no candidate and are predicted as singletons. For transparency: the stage-1 model scores all 30
+retrieved pairs, and the stage-2 group features summarize those stage-1 scores; only the final model's input is
+restricted to the pre-filtered candidates.</div>
+
+<!-- ============================================================ -->
+<h2>3. Model Architecture and Feature Engineering</h2>
+
+<h3>3.1 Stage-1 pair features (26)</h3>
+<p>All string similarities are computed with <code>rapidfuzz.process.cpdist</code> over whole arrays of pairs (C++,
+multithreaded), not per-pair Python calls, because the test set has tens of millions of pairs.</p>
+<table>
+  <tr><th style="width:22%">Group</th><th>Features</th></tr>
+  <tr><td>Blocking (7)</td><td>Total IDF score, name part, address part; rank among the entity's candidates; number of
+      candidates; gap to and ratio of the entity's best score</td></tr>
+  <tr><td>Name (7)</td><td>On core names: ratio, token-set ratio, token-sort ratio, partial ratio, Jaro-Winkler;
+      gap to the entity's best name token-set score; either-name-empty flag</td></tr>
+  <tr><td>Address (4)</td><td>Ratio, token-set ratio, token-sort ratio on normalized addresses; gap to the entity's best
+      address token-set score</td></tr>
+  <tr><td>Numbers (3)</td><td>Token-set ratio on the sorted address-number strings; first-number equality;
+      first-number missing flag</td></tr>
+  <tr><td>Record shape (5)</td><td>Core-name token counts (both sides); non-ASCII share of each raw name
+      (native-script detection); Source 3 flag</td></tr>
+</table>
+
+<h3>3.2 Stage-2 group-context features (+12)</h3>
+<p>True matches of one business resemble each other, so each candidate is judged against its entity's other
+candidates. The <i>reference</i> is the entity's best <i>other</i> candidate by p1.</p>
+<table>
+  <tr><th style="width:22%">Group</th><th>Features</th></tr>
+  <tr><td>Own position (3)</td><td>Stage-1 probability p1; its rank within the entity; gap to the entity's best p1</td></tr>
+  <tr><td>Competition (4)</td><td>Max and sum of the other candidates' p1; sum of other same-source candidates' p1;
+      number of candidates with p1 &ge; 0.5</td></tr>
+  <tr><td>Reference (5)</td><td>Reference's p1; same-source flag; name, address and address-number token-set similarity
+      between this candidate and the reference</td></tr>
+</table>
+<p>Example: a Source 2 record with an unrelated trade name gets little support from stage 1, but if it shares the
+address and numbers of a high-confidence candidate, stage 2 recovers it.</p>
+
+<h3>3.3 Models</h3>
+<table>
+  <tr><th></th><th>Stage 1</th><th>Stage 2</th></tr>
+  <tr><td>Algorithm</td><td colspan="2">LightGBM binary classifier (MIT licence)</td></tr>
+  <tr><td>Hyperparameters</td><td colspan="2">127 leaves, learning rate 0.1, min_child_samples 100, feature_fraction 0.8,
+      bagging_fraction 0.8 (every iteration), L2 = 1.0, up to 1,500 rounds with early stopping (50) on the tune split</td></tr>
+  <tr><td>Inputs</td><td>26 pair features</td><td>26 + 12 = 38 features (trained on out-of-fold p1)</td></tr>
+  <tr><td>Trees (after early stopping)</td><td>1,067</td><td>571</td></tr>
+  <tr><td>Model file size</td><td>15 MB</td><td>8 MB</td></tr>
+  <tr><td>Top features (share of gain)</td>
+      <td>rank among candidates 47%, address-number token-set 15%, address token-set 6%, relative blocking score 5%,
+          name Jaro-Winkler 4%</td>
+      <td>p1 67%, p1 rank 19%, candidates with p1 &ge; 0.5 4%, address-number token-set 3%</td></tr>
+</table>
+<p>Total model size is a few MB, far below the 8B-parameter limit. No pretrained language models or embeddings are used.</p>
+
+<h3>3.4 Decision rule (tuned for macro F0.5)</h3>
+<p>Two rule families are grid-searched on the tune split for each stage, and the (stage, rule) with the best tune score
+is kept:</p>
+<ul>
+  <li><b>Threshold rule:</b> keep every candidate with p &ge; t<sub>all</sub>, plus the entity's single best candidate if
+      p &ge; t<sub>top</sub>. Only 5.6% of entities are singletons and an empty prediction scores 0 for everyone else, so
+      a lower bar for the top candidate pays off.</li>
+  <li><b>Expected-F0.5 rule:</b> per entity, with candidates sorted by p, predict the top <i>j</i> that maximizes
+      <span class="formula" style="display:inline;padding:0 3pt">EF(j) = 1.25 &middot; &Sigma;<sub>i&le;j</sub> p<sub>i</sub> / (j + 0.25 &middot; (&Sigma;<sub>i</sub> p<sub>i</sub> + c))</span>,
+      where <i>c</i> estimates true matches that blocking never retrieved; predict nothing when
+      s &middot; &Pi;<sub>i</sub>(1 &minus; p<sub>i</sub>) (an estimate that the entity is a singleton) is larger.</li>
+</ul>
+<p><b>Chosen:</b> stage 2 with the threshold rule, t<sub>all</sub> = 0.725, t<sub>top</sub> = 0.56, applied to the
+pre-filtered candidates.</p>
+
+<table>
+  <tr><th>Model</th><th>Rule (tuned parameters)</th><th class="n">Tune split</th><th class="n">Report split</th></tr>
+  <tr><td>Stage 1 only</td><td>threshold (0.675 / 0.64)</td><td class="n">0.9164</td><td class="n">0.9160</td></tr>
+  <tr><td>Stage 1 only</td><td>expected F0.5 (c = 0.8, s = 1.0)</td><td class="n">0.9166</td><td class="n">0.9171</td></tr>
+  <tr class="hl"><td>Stage 1 + 2</td><td>threshold (0.725 / 0.56)</td><td class="n">0.9269</td><td class="n">0.9264</td></tr>
+  <tr><td>Stage 1 + 2</td><td>expected F0.5 (c = 0.0, s = 0.9)</td><td class="n">0.9267</td><td class="n">0.9265</td></tr>
+</table>
+<p>The group-context stage adds about one point of macro F0.5. Once probabilities are this good, the two decision rules
+tie.</p>
+
+<!-- ============================================================ -->
+<h2>4. Other Relevant Information</h2>
+
+<h3>4.1 Results and submission history</h3>
+<table>
+  <tr><th>Version</th><th>Change</th><th class="n">Candidates / entity</th><th class="n">Report F0.5</th><th class="n">Public LB</th></tr>
+  <tr><td>v1</td><td>Stage-1 LightGBM (200k training entities), threshold rule</td><td class="n">30</td><td class="n">0.9165</td><td class="n">&ndash;</td></tr>
+  <tr><td>v2</td><td>+ stage-2 group-context model (300k entities), rule chosen on tune split</td><td class="n">30</td><td class="n">0.9264</td><td class="n">0.902</td></tr>
+  <tr class="hl"><td>v3</td><td>v2 + learned pre-filter p1 &ge; 0.1</td><td class="n">3.84 (test)</td><td class="n">0.9263</td><td class="n">&ndash;</td></tr>
+</table>
+<p>Every uploaded file passed the official validator. The gap between held-out (0.926) and public (0.902) is expected:
+the test set is about 15% France, a country absent from training, and 47% India, the harder training country (held-out
+0.8950 for India vs 0.9469 for the US).</p>
+
+<h3>4.2 Error analysis (report split, 30,057 entities)</h3>
+<ul>
+  <li><b>Where recall is lost.</b> Of 103,940 true pairs, 8,965 (8.6%) never reach the top-30 candidates and 6,266
+      (6.0%) are retrieved but rejected by the model. There are 1,837 false positives; 1,521 of 1,673 singletons are
+      correctly left empty.</li>
+  <li><b>Share of lost F0.5:</b> 69% partial recall on entities with matches, 24% entities with matches that get an empty
+      prediction, 7% singletons given a false match.</li>
+  <li><b>False positives:</b> near-identical distractors with the same name at a slightly different number
+      (<i>1572</i> vs <i>1582 Hardee Street</i>, door <i>16-5-1</i> vs <i>16-5-3</i>); a different business at the same
+      address; one-character name changes (<i>LFZ Foods</i> vs <i>LZ Foods</i>) at an identical address.</li>
+  <li><b>False negatives:</b> candidates with an empty address; true matches with an unrelated trade name or a name in
+      Kannada or Devanagari script; heavy typos (<i>CHENNAI PRTEDCTON</i>); street numbers that differ between sources
+      (<i>1557</i> vs <i>1330 Bunce Road</i>).</li>
+</ul>
+
+<h3>4.3 Compliance</h3>
+<ul>
+  <li>Only the provided data is used: no geocoding, business registries, external APIs, web data or augmentation. The
+      abbreviation and legal-form lists are short, generic, hand-written rules.</li>
+  <li>Dependencies are permissively licensed: LightGBM and rapidfuzz (MIT); pandas, NumPy, SciPy and scikit-learn (BSD;
+      scikit-learn is used only for feature hashing). No GPL code. Model size is a few MB, far below 8B parameters.</li>
+  <li><code>candidate_pairs.tsv</code> is exactly the set the final model scored, and matches are a subset of it.</li>
+</ul>
+
+<h3>4.4 Reproducibility and efficiency</h3>
+<ul>
+  <li><code>python src/main.py train</code> then <code>python src/main.py predict</code> reproduce the models and both
+      output files; <code>utils/validate_submission.py</code> is the official validator, unchanged. All randomness is seeded.</li>
+  <li>Runs on one laptop (Windows 11, 14 cores, 31 GB RAM): training 31 min; test prediction 58 min (blocking 12 min,
+      scoring 39 min over 51.9M retrieved pairs).</li>
+  <li>Memory-conscious engineering: sources are read and normalized in 1M-row chunks; each country's index is freed
+      before the next is built; features are computed in ~3M-pair chunks that never split an entity's candidates
+      (the gap and group features are per entity).</li>
+  <li>Output files are written with LF line endings and no quoting, since the official scorer strips only
+      <code>\n</code>.</li>
+</ul>
+
+<h3>4.5 Limitations and next steps</h3>
+<ul>
+  <li><b>Blocking recall is the main ceiling:</b> 8.6% of true pairs are never retrieved. Transliteration-aware keys for
+      native-script names and character n-gram keys for heavy typos are the most promising additions.</li>
+  <li>France is unseen in training. Normalization already drops common French legal forms and articles (SARL, SAS,
+      EURL, de, la), and the features are language-agnostic, but the model and thresholds are calibrated on US and
+      India data only.</li>
+  <li>Distractor records with a near-identical address need finer number handling, for example comparing structured
+      door and unit numbers instead of token sets.</li>
+</ul>
+
+</body>
+</html>
